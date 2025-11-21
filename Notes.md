@@ -27,20 +27,20 @@ Moderm : <code>npx sv create [file name]</code>
 
 ### Choose Template
 1. Sveltekit Minimal
-- bare-bones Sveltekit project with only the essential files
-- includes
-    - basic Sveltekit routing
-    - +page.svelte & +layout.svelte
-- normally used for project that starting from scratch
+    - bare-bones Sveltekit project with only the essential files
+    - includes
+        - basic Sveltekit routing
+        - +page.svelte & +layout.svelte
+    - normally used for project that starting from scratch
 
 2. Sveltekit Demo
-- Sveltekit project with many scample features included
-- used for learning features
+    - Sveltekit project with many scample features included
+    - used for learning features
 
 3. Svelte Library
-- template for building reusable Svelte components that you will publish as a library/package
-- Eg: UI component library / Reusable widgets
-- Used for making reusable component libraries / sharing components across multiple apps
+    - template for building reusable Svelte components that you will publish as a library/package
+    - Eg: UI component library / Reusable widgets
+    - Used for making reusable component libraries / sharing components across multiple apps
 
 ### Choose Features Included
 1. Eslint - for code linting (highlight warnings)
@@ -51,13 +51,15 @@ Moderm : <code>npx sv create [file name]</code>
 ### Run the application
 <code>npm run dev -- --open </code>
 
+<code>npm run dev</code>
+
 
 <br><br>
 
 # Project Structure
 ### Configuration Files
 1. package.json
-- contain script and dependencies of the project
+    - contain script and dependencies of the project
 
 Scripts:
 1. dev : run application in instant reloading
@@ -65,26 +67,26 @@ Scripts:
 3. preview : start the compiled application in production mode
 
 2. package-lock.json
-- ensure consistency installation of dependencies
+    - ensure consistency installation of dependencies
 
 3. svelte.config.js
-- Sveltekit configuration files
+    - Sveltekit configuration files
 
 4. vite.config.js
-- Vite configuration files
+    - Vite configuration files
 
 5. .eslintrc.cjs
-- Eslint configuration files
+    - Eslint configuration files
 
 6. .eslintignore
-- warnings/stuffs that ignored by Eslint
+    - warnings/stuffs that ignored by Eslint
 
 ### .svelte-kit
 - folder generated when running build/dev script
 
 ### src
 1. routes
-- reponsible for entire routing in application
+    - reponsible for entire routing in application
 
     a. +page.svelte
     - files get served when visiting localhost:5173
@@ -109,9 +111,12 @@ Scripts:
 1. Create a folder with the name of the path. (Eg about : http://localhost:5173/about)
 2. Create a file in the new folder with the name of +page.svelte
 
+<br>
 <strong>Note:</strong>If the path name is not found from the folders, 404 pages will render.
 
+<br>
 <hr>
+<br>
 
 ### Dynamic Routing
 - create nested folder with naming convention "[<param>]"
@@ -187,3 +192,178 @@ Scripts:
 
 ### DELETE request
 - export async function DELETE(requestEvent)
+
+<br><br>
+
+# External Data
+### Setup
+1. Download json-server : <code>npm i json-server</code>
+2. In Package.json file, write the script for json-server : <code>"server-json" : "json-server --watch db.json --port 4000"</code>
+
+### Fetch function
+Always use fetch function from loadEvent instead of Window fetch as:
+1. allow to get Handler without making an additional request 
+    - sveltekit's fetch does not make a real network request for local endpoints\
+    - so it is very fast
+2. dont need to specify full URL (eg: api/postcodes)
+    - sveltekit does server-side rendering (SSR)
+    - sveltekit's fetch works before HTML is sent to the browser
+
+### Universal Load Function
+- in +page.js
+- responsible for loading page data both on server and browser
+- not like client routing (eg clicking on link to another page) only browser will receive it, not the server
+- can pass Component constructor in props
+- use when have to return values that a server load function cannot return
+
+### Server Load Function
+- in +page.server.js
+- same as universal load function but runs only on the server and not in the browser
+- cannot pass Component constructor in props
+- use when returning data that involves sensitive information as part of fetching data
+
+
+<br><br>
+
+# Error
+1. import {error} from '@sveltejs/kit' into server load file
+2. throw error for specific condition : throw error(<http code>, <object (default message)>)
+    - Example1: throw error (404, 'Not Found')
+    - Example2: throw error (404, 'message': 'not found', 'hint': 'try again')
+3. create +error.svelte file to customize the error page
+
+# Redirect
+1. import {redirect} from '@sveltejs/kit' into server load file
+2. throw error for specific condition : throw redirect(<http code>, <path>)
+    - Example1: throw error (307, '/products')
+
+<br><br>
+
+# Parent Data & Child Data
+### Parent Data
+- loadEvent will return parent function
+- by invoking the parent() will return data sent from parent component: <code>await parent()</code>
+
+### Child Data
+- import page from '$app/stores'
+- could access the data send from child component using : <code>$page.data.<var></code>
+
+<br><br>
+
+# Promise Unwrapping
+- allow all the promise to be executed in parallel
+- see <a href = 'C:\Coding Bundle\Coding\JavaScript\Sweltekit\sk-loading-data\src\routes\stocks\+page.js'>this</a>
+
+<br><br>
+
+# Data Invalidation
+- refetch a url when the data changes
+- it will call the load function that fetch the url specified
+- could use depends argument to give load function a label & use it in +page.svelte
+- invalidateAll() will call all the load functions
+- see <a href='C:\Coding Bundle\Coding\JavaScript\Sweltekit\sk-loading-data\src\routes\stocks\+page.svelte'>here</a>
+
+<br><br>
+
+# Link Options
+1. data-sveltekit-preload-data
+    - preload data in browser network upon event
+    - event could be
+        - off
+        - hover
+        - tap
+
+2. data-sveltekit-preload-code
+    - preload code (only) in browser network upon event
+    - event could be 
+        - off
+        - hover
+        - tap
+        - eager
+        - viewport
+
+3. data-sveltekit-reload
+    - reload data whenever refresh in page
+
+4. data-sveltekit-noscroll
+    - preserve the viewport within pages
+    - if im at the bottom on previous page, navigate to next page would be at bottom as well
+
+### Programmatically Preload
+see <a href= 'C:\Coding Bundle\Coding\JavaScript\Sweltekit\sk-loading-data\src\routes\+page.svelte'>here</a>
+
+
+<br><br>
+
+# Page Options
+- Render component process:
+    -> Sveltekit render component on server 
+    -> send to client in HTML 
+    -> render component in browser to make it interactive (aka hydration)
+
+1. Server-side rendering (SSR)
+    - <code>export const ssr = true</code>
+2. Client-side rendering (CSR)
+    - <code>export const csr = true</code>
+3. Prerender 
+    - Render all the HTML for pages at build time rather than run time
+    - avoid recomputing page for each visitor
+    - build process is expensive
+    - pre-rendered content can only be updated by building a new version of the application
+    - eg: blog pages, e-commerce product pages
+
+### Prerendering
+- create a output folder under .svelte-kit
+- all HTML files are generated during build time even no request for that
+- HTML requested will be sent immediately as no need to request from the server
+- <code>export const prerender = true</code>
+
+### Prerendering API routes
+- once prerendered, the data will stored in output/dependencies file and not change anymore unless run "build" script again
+### Prerendering Dynamic routes
+### Prerendering and SSR
+- set rendering to "auto"
+
+<br><br>
+
+# Form Actions
+- allow to post data to server without relying on client side Javascript
+- (if disable javascript in browser, the form will not work)
+- define in +page.server.js
+
+### Default & Named Form Actions
+- "default" only used when there is one named form action
+- it is better to use named form actions to differentiate which DOM has to execute which actions
+- see <a href='C:\Coding Bundle\Coding\JavaScript\Sweltekit\sk-form-actions\src\routes\auth\+page.server.js'>here</a>
+
+### Form Action Validation & Redirects
+- import fail from '@sveltejs/kit'
+- see <a href='C:\Coding Bundle\Coding\JavaScript\Sweltekit\sk-form-actions\src\routes\auth\+page.server.js'>here</a>
+
+### Progressive Enhancement
+- use "use:enhance" for form tag
+- submit form through fetch, thus no reload -> faster
+- see <a href='C:\Coding Bundle\Coding\JavaScript\Sweltekit\sk-form-actions\src\routes\auth\+page.server.js'>here</a>
+
+### Snapshots
+- keep the data typed before if the form is not submitted successfully
+- see <a href='C:\Coding Bundle\Coding\JavaScript\Sweltekit\sk-form-actions\src\routes\contact\+page.svelte'>here</a>
+
+
+# Environment Variables
+- allow to specify different values basd on the environment like development or testing or production
+- allow to safeguard secrets by not bundling them into the code that is shipped to the browser
+- PUBLIC prefix is needed to name the variable in .env if import from from "env/static/public" module
+- env variables imported from /static are injected into code at build time
+- runtime environment variables (value might change once app is deployed) should make use of dynamic modules:
+    - env/dynamic/public
+    - env/dynamic/private
+
+### Server-only-modules
+- only server can access it
+- two ways:
+    1. create file "/server/secret.js" in lib and import in application file
+    2. create file "secrets.server.js" in src folder
+
+<br><br>
+
