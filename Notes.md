@@ -726,7 +726,7 @@ let {super: trouper = 'Hello'} = $props()
 <p>{message}</p>
 ```
 
-### $inspect
+### $inspect (debugging rune)
 ```
 <script>
 	let count = $state(0);
@@ -812,7 +812,109 @@ let {super: trouper = 'Hello'} = $props()
     4. $host() is not reactive store or derived value
 
 
+<br><br>
 
+# Syntax
+1. if-else statment
+- {#if expression}...{:else if expression}...{:else}...{/if>}
+
+2. foreach
+- {#each expression as name, index}...{/each}
+- {#each items as item(item.id)}...{/each}
+    - (item.id) = providing a key for each item
+    - if without key, Svelte may add/remove DOM nodes at the end and update remaining ones
+    - if with key, Svelte knows which item corresponds to which DOM node, so can preserve components or DOM nodes better
+    - key must be unique (can be int or str)
+
+3. key
+- {#key expression}...{/key}
+    - destroy and recreate their contents when value of an expression changes
+
+4. await
+- {#await expression}...{:then name}...{:catch name}...{/await}
+    - allow to branch on three possible states of a Promise : pending, fulfilled, rejected
+    - during SSR, only pending branch will be rendered
+    - if provided expression is not a Promise, only :then branch will be rendered
+
+5. snippet (slots in Svelte 4)
+- {#snippet name(paramOpt)}...{/snippet}
+    - create reusable chunks or markup inside components
+    - use `@render name(paramOpt)` to invoke
+    - can be declared anywhere inside the component
+    - can be passed as props data
+        `<Table data={fruits} {header} {row} />` where header and row are snippet
+```
+{#snippet figure(image)}
+	<figure>
+		<img sr c={image.src} alt={image.caption} width={image.width} height={image.height} />
+		<figcaption>{image.caption}</figcaption>
+	</figure>
+{/snippet}
+
+{#each images as image}
+	{#if image.href}
+		<a href={image.href}>
+			{@render figure(image)}
+		</a>
+	{:else}
+		{@render figure(image)}
+        {@render figure?.(image)} // optional snippets
+	{/if}
+{/each}
+```
+
+- typing snippet : Snippet interface
+```
+<script lang="ts">
+	import type { Snippet } from 'svelte';
+
+	interface Props {
+		data: any[];
+		children: Snippet;
+		row: Snippet<[any]>;
+	}
+
+	let { data, children, row }: Props = $props();
+</script>
+```
+
+6. @html
+- allow to inject raw HTML into component's markup
+- does not sanitize the string pass into {@html}
+```
+<article>
+	{@html content}
+</article>
+
+<!-- Without :global, it will not work -->
+<style>
+	article :global {
+		a { color: hotpink }
+		img { width: 100% }
+	}
+</style>
+```
+
+7. @attach
+- allow to attach behavior to a DOM node when it is mounted
+- attachment = function that receives the element and optionally return a cleanup function
+- useful for integrating third-party libraries that need to control DOM elements in reactive way
+- if state inside attachment changes, attachments re-run
+```
+<script lang="ts">
+	import type { Attachment } from 'svelte/attachments';
+
+	const myAttachment: Attachment = (element) => {
+		console.log(element.nodeName); // 'DIV'
+
+		return () => {
+			console.log('cleaning up');
+		};
+	};
+</script>
+
+<div {@attach myAttachment}>...</div>
+```
 
 
 
