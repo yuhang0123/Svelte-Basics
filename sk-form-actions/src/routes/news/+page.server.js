@@ -20,5 +20,5 @@ export const load = ({cookies, url}) => {
         {id:3, title:'News 3'}
     ]
 
-    return news;
+    return {news};
 }
