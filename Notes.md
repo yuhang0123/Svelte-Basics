@@ -367,3 +367,460 @@ see <a href= 'C:\Coding Bundle\Coding\JavaScript\Sweltekit\sk-loading-data\src\r
 
 <br><br>
 
+# Runes
+- symbols used in .svelte / .svelte.js files to control the Svelte compiler
+
+### $state
+```
+<script>
+	let count = $state(0);
+</script>
+
+<button onclick={() => count++}>
+	clicks: {count}
+</button>
+```
+- allow to create reactive state (aka UI reacts when it is changed)
+- when involving class, be careful of "this" as it may refer to different DOM when not implementing correctly
+- use it when need a local state or a global state that is independent of a source
+
+1. $state.raw
+    - if dont want object and arrays to be deeply reactive
+    - not able to change the properties value, only can push a new object to replace it
+    ```
+    let person = $state.raw({
+        name: 'Heraclitus',
+        age: 49
+    });
+
+    // this will have no effect
+    person.age += 1;
+
+    // this will work, because we're creating a new person
+    person = {
+        name: 'Heraclitus',
+        age: 50
+    };
+    ```
+
+2. $state.snapshot
+    - take a static snapshot of $state proxy
+    - use when want to pass state to external library / API that dont expect a proxy
+    ```
+    <script>
+	let counter = $state({ count: 0 });
+
+	function onclick() {
+		// Will log `{ count: ... }` rather than `Proxy { ... }`
+		console.log($state.snapshot(counter));
+	}
+    </script>
+    ```
+
+3. $state.eager
+    - use when want to update UI as soon as the state changes (as updates are synchronized as default)
+    ```
+    <nav>
+        <a href="/" aria-current={$state.eager(pathname) === '/' ? 'page' : null}>home</a>
+        <a href="/about" aria-current={$state.eager(pathname) === '/about' ? 'page' : null}>about</a>
+    </nav>
+    ```
+4. Share state between modules (2 methods):
+
+    a. Don't reassign it
+    ```
+    // This is allowed — since we're updating
+    // `counter.count` rather than `counter`,
+    // Svelte doesn't wrap it in `$.state`
+    export const counter = $state({
+        count: 0
+    });
+
+    export function increment() {
+        counter.count += 1;
+    }
+    ```
+
+    b. Don't directly export it
+    ```
+    let count = $state(0);
+
+    export function getCount() {
+        return count;
+    }
+
+    export function increment() {
+        count += 1;
+    }
+    ```
+
+### derived
+- disallow state changes inside $derived expressions
+- $derived(expression) === $derived.by(() => expression) 
+- $derived for short expression and $derived.by for long expression
+- use it when value is computed from a source of truth (eg server data)
+
+```
+
+1. Overriding derived values
+<script>
+	let { post, like } = $props();
+
+	let likes = $derived(post.likes);
+
+	async function onclick() {
+		// increment the `likes` count immediately...
+		likes += 1;
+
+		// and tell the server, which will eventually update `post`
+		try {
+			await like();
+		} catch {
+			// failed! roll back the change
+			likes -= 1;
+		}
+	}
+</script>
+
+<button {onclick}>🧡 {likes}</button>
+```
+
+2. Overriding deeply reactive items
+```
+let items = $state([ /*...*/ ]);
+
+let index = $state(0);
+let selected = $derived(items[index]);
+```
+
+3. Destructing make the variables reactive
+```
+let { a, b, c } = $derived(stuff());
+```
+
+### $effect
+```
+<script>
+	let size = $state(50);
+	let color = $state('#ff3e00');
+
+	let canvas;
+
+	$effect(() => {
+		const context = canvas.getContext('2d');
+		context.clearRect(0, 0, canvas.width, canvas.height);
+
+		// this will re-run whenever `color` or `size` change
+		context.fillStyle = color;
+		context.fillRect(0, 0, size, size);
+	});
+</script>
+
+<canvas bind:this={canvas} width="100" height="100"></canvas>
+```
+- allow to run function that depends on reactive state
+- Example: state updates / calling third-party libraries / drawing on <canvas> elements / making network requests
+- only run in browser, not during SSR
+- useful when:
+    - side effects need to interact with real world 
+    - cleanup logic is needed (teardown function)
+
+#### Lifecycle & Dependencies
+1. Tracking dependencies
+    - automatically track which reactive values read (eg $state, $derived)
+    - if any of these tracked values change, effect will re-run
+    - if read reactive value after "await" or inside "setTimeout", won't tract the dependency
+
+2. Batching & Timing
+    - effects run after component is mounted in the DOM
+    - multiple changes in a short time will only trigger one effect run
+
+3. Clean-up / teardown
+    - effect return a cleanup function which runs before the effect re-runs & when component is destroyed
+    - normally used to clear intervals / unsubscribing listeners...
+
+#### Variants
+1. $effect.pre
+    - runs before DOM updates
+    - useful for things like scroll positioning
+    ```
+    <script>
+	import { tick } from 'svelte';
+
+	let div = $state();
+	let messages = $state([]);
+
+	// ...
+
+	$effect.pre(() => {
+		if (!div) return; // not yet mounted
+
+		// reference `messages` array length so that this code re-runs whenever it changes
+		messages.length;
+
+		// autoscroll when new messages are added
+		if (div.offsetHeight + div.scrollTop > div.scrollHeight - 20) {
+			tick().then(() => {
+				div.scrollTo(0, div.scrollHeight);
+			});
+		}
+	});
+    </script>
+
+    <div bind:this={div}>
+        {#each messages as message}
+            <p>{message}</p>
+        {/each}
+    </div>
+    ```
+
+2. $effect.tracking
+    - return true/false whether currently inside an effect tracking context
+    ```
+    <script>
+	console.log('in component setup:', $effect.tracking()); // false
+
+	$effect(() => {
+		console.log('in effect:', $effect.tracking()); // true
+	});
+    </script>
+
+    <p>in template: {$effect.tracking()}</p> <!-- true -->
+    ```
+
+3. $effect.pending
+    - check how many promises are pending in the current "effect boundary"
+    - useful to show loading states when doing async stuff
+    ```
+    <button onclick={() => a++}>a++</button>
+    <button onclick={() => b++}>b++</button>
+
+    <p>{a} + {b} = {await add(a, b)}</p>
+
+    {#if $effect.pending()}
+        <p>pending promises: {$effect.pending()}</p>
+    {/if}
+    ```
+
+4. $effect.root
+    - does not auto-cleanup like normal effects
+    - useful for manual control of nested effects / when want effects persist beyond component lifecycle
+    ```
+    const destroy = $effect.root(() => {
+        $effect(() => {
+            // setup
+        });
+
+        return () => {
+            // cleanup
+        };
+    });
+
+    // later...
+    destroy();
+    ```
+### $props
+```
+<script>
+    let { adjective } = $props();
+</script>
+
+<p>This component is {adjective}</p>
+
+```
+- replace "export let propName" in Svelte 4
+- use when want to read props passed in from the parent
+- don't use when want a component to own its own copy of a prop
+
+#### Fallback values
+- destructing allow to declare fallback values (if not set in the parent component)
+- fallback values are not reactive proxies
+```
+let {adjective='happy'} = $props();
+```
+
+#### Renaming props
+- use "super:"
+```
+let {super: trouper = 'Hello'} = $props()
+```
+
+#### Updating props
+- $props() are reactive : if parent update prop, child see the changes
+- child able to temporarily override prop value (unless prop is regular object (not bindable))
+```
+# parent
+<script lang="ts">
+	import Child from './Child.svelte';
+</script>
+
+<Child object={{ count: 0 }} />
+
+# child
+<script lang="ts">
+	let { object } = $props();
+</script>
+
+<button onclick={() => {
+	// has no effect
+	object.count += 1
+}}>
+	clicks: {object.count}
+</button>
+```
+- if props is reactive state, still work but will get warning "ownership_invalid_mutation"
+```
+# parent
+<script lang="ts">
+	import Child from './Child.svelte';
+
+	let object = $state({count: 0});
+</script>
+
+<Child {object} />
+
+# child
+<script lang="ts">
+	let { object } = $props();
+</script>
+
+<button onclick={() => {
+	// will cause the count below to update,
+	// but with a warning. Don't mutate
+	// objects you don't own!
+	object.count += 1
+}}>
+	clicks: {object.count}
+</button>
+```
+
+#### $props.id
+- generate a unique ID for component instance
+- useful for linking thing like `<label for='...'>`
+
+### $bindable
+```
+# parent
+<script lang="ts">
+	let { value = $bindable(), ...props } = $props();
+    <!-- specify fallback value when no prop is passed at all: let {value = $bindable('fallback'), ...props} = $props(); -->
+</script>
+
+<input bind:value={value} {...props} />
+
+<style>
+	input {
+		font-family: 'Comic Sans MS';
+		color: deeppink;
+	}
+</style>
+
+# child
+<script lang="ts">
+	import FancyInput from './FancyInput.svelte';
+
+	let message = $state('hello');
+</script>
+
+<FancyInput bind:value={message} />
+<p>{message}</p>
+```
+
+### $inspect
+```
+<script>
+	let count = $state(0);
+	let message = $state('hello');
+
+	$inspect(count, message); // will console.log when `count` or `message` change
+</script>
+
+<button onclick={() => count++}>Increment</button>
+<input bind:value={message} />
+```
+- === console.log (only it will re-run whenever its argument changes)
+- track reactive state deeply
+- only work in development mode; production builds become noop
+
+1. $inspect(...).with
+    - can invoke with a callback which will then be invoked instead of console.log
+    ```
+    <script>
+	let count = $state(0);
+
+    // type is either "init" or "update"
+	$inspect(count).with((type, count) => {
+		if (type === 'update') {
+			debugger; // or `console.trace`, or whatever you want
+		}
+	});
+    </script>
+
+    <button onclick={() => count++}>Increment</button>
+    ```
+
+2. $inspect.trace(...)
+    - cause surrounding function to be traced in development
+    - information will be printed to the console about which pieces of reactive state cause the effect to fire
+    ```
+    <script>
+	import { doSomeWork } from './elsewhere';
+
+	$effect(() => {
+		// $inspect.trace must be the first statement of a function body
+        // $inspect.trace(label), where label is optional
+		$inspect.trace();
+		doSomeWork();
+	});
+    </script>
+    ```
+
+### $host
+```
+# parent
+<svelte:options customElement="my-stepper" />
+
+<script lang="ts">
+	function dispatch(type) {
+		$host().dispatchEvent(new CustomEvent(type));
+	}
+</script>
+
+<button onclick={() => dispatch('decrement')}>decrement</button>
+<button onclick={() => dispatch('increment')}>increment</button>
+
+# child
+<script lang="ts">
+	import './Stepper.svelte';
+
+	let count = $state(0);
+</script>
+
+<my-stepper
+	ondecrement={() => count -= 1}
+	onincrement={() => count += 1}
+></my-stepper>
+
+<p>count: {count}</p>
+```
+- provide access to the host DOM element when a Svelte component is compiled as a custom element / web component
+- Example: allow to dispatch custom events
+- Rules:
+    1. must set <svelte:options customElement=<tag-name> />
+    2. $host() return a real DOM element
+    3. naming : increment in parent, child will use onincrement
+    4. $host() is not reactive store or derived value
+
+
+
+
+
+
+
+
+
+<br><br>
+
+# Deploy
+Visit <a href='https://vercel.com'>Vercel</a>
+
